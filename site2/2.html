@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thinking in Code 2</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    background: #eef2f3;
+    margin-top: 20px;
+  }
+
+  .grid {
+    position: relative;
+    width: 420px;
+    height: 420px;
+    display: grid;
+    grid-template-columns: repeat(4, 100px);
+    grid-template-rows: repeat(4, 100px);
+    gap: 5px;
+    background: #999;
+    padding: 5px;
+    transition: background 0.6s;
+  }
+
+  .cell {
+    background: white;
+    border: 2px solid #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cell.visited {
+    background: #d3e5ff;
+  }
+
+  .cell.house-cell {
+    background: #fff9c4;
+    font-size: 32px;
+    color: #e67e22;
+  }
+
+  .cell.reached {
+    background: #b6ffb6 !important;
+  }
+
+  .boy {
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    transition: top 0.9s ease, left 0.9s ease;
+  }
+
+  .boy.walking {
+    animation: bounce 0.3s ease-in-out infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  .controls {
+    margin-top: 20px;
+  }
+
+  button { margin: 4px; padding: 8px 16px; cursor: pointer; }
+
+  #commandsContainer {
+    width: 360px;
+    height: 200px;
+    border: 2px solid #666;
+    background: #fafafa;
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    overflow-y: auto;
+    padding: 10px;
+    transition: background 0.6s;
+  }
+
+  .command-cell {
+    width: 320px;
+    background: #ffffff;
+    border: 1px solid #999;
+    border-radius: 5px;
+    margin: 4px 0;
+    padding: 5px 10px;
+    display: flex;
+    align-items: center;
+    font-weight: bold;
+    cursor: grab;
+  }
+
+  .command-cell.active {
+    background: #d3e5ff;
+    border-color: #007BFF;
+  }
+
+  .command-cell.dragging {
+    opacity: 0.6;
+    background: #f0f8ff;
+  }
+
+  .arrow {
+    margin-right: 8px;
+    color: #007BFF;
+    visibility: hidden;
+  }
+
+  .command-cell.active .arrow {
+    visibility: visible;
+  }
+</style>
+</head>
+<body>
+
+<h2>Thinking in Code 2</h2>
+
+<div class="grid" id="grid">
+  <!-- 16 cells -->
+  <div class="cell" id="cell-0"></div>
+  <div class="cell" id="cell-1"></div>
+  <div class="cell" id="cell-2"></div>
+  <div class="cell" id="cell-3"></div>
+  <div class="cell" id="cell-4"></div>
+  <div class="cell" id="cell-5"></div>
+  <div class="cell" id="cell-6"></div>
+  <div class="cell" id="cell-7"></div>
+  <div class="cell" id="cell-8"></div>
+  <div class="cell" id="cell-9"></div>
+  <div class="cell" id="cell-10"></div>
+  <div class="cell" id="cell-11"></div>
+  <div class="cell" id="cell-12"></div>
+  <div class="cell" id="cell-13"></div>
+  <div class="cell" id="cell-14"></div>
+  <div class="cell house-cell" id="cell-15"><i class="fa-solid fa-house"></i></div>
+
+  <img src="boy_north.png" class="boy" id="boy" alt="Boy">
+</div>
+
+<div class="controls">
+  <button onclick="addCommand('turnLeft')">Turn Left</button>
+  <button onclick="addCommand('turnRight')">Turn Right</button>
+  <button onclick="addCommand('moveForward')">Move Forward</button>
+  <button onclick="addCommand('moveBackward')">Move Backward</button>
+  <button onclick="runCommands()">▶ Run</button>
+  <button onclick="reset()">🔄 Reset</button>
+</div>
+
+<div id="commandsContainer"></div>
+
+<script>
+const grid = document.getElementById('grid');
+const boy = document.getElementById('boy');
+const cells = [...document.querySelectorAll('.cell')];
+const commandsContainer = document.getElementById('commandsContainer');
+const gridSize = 4;
+const cellSize = 105;
+const delay = 1000;
+let commands = [];
+let facing = 0;
+let running = false;
+let pos = { row: 2, col: 1 }; // Start from 10th block (row2,col1) in 4x4
+const boyImages = ["boy_north.png", "boy_east.png", "boy_south.png", "boy_west.png"];
+const housePos = { row: 3, col: 3 };
+
+// Position boy
+function setBoyPosition() {
+  boy.style.top = `${pos.row * cellSize + 25}px`;
+  boy.style.left = `${pos.col * cellSize + 25}px`;
+  boy.src = boyImages[facing];
+}
+
+// Highlight visited cells
+function highlightPath() {
+  const idx = pos.row * gridSize + pos.col;
+  cells[idx].classList.add('visited');
+}
+
+// Default commands when loading page
+window.onload = function() {
+  const defaultCmds = ["turnRight", "moveForward", "moveForward", "turnRight", "moveForward"];
+  defaultCmds.forEach(cmd => addCommand(cmd));
+  setBoyPosition();
+  highlightPath();
+};
+
+// Add command
+function addCommand(cmd) {
+  const cell = document.createElement('div');
+  cell.className = 'command-cell';
+  cell.draggable = true;
+  cell.innerHTML = `<span class='arrow'>➤</span> ${cmd}`;
+  commandsContainer.appendChild(cell);
+  commands.push(cmd);
+  cell.addEventListener('dragstart', dragStart);
+  cell.addEventListener('dragend', dragEnd);
+}
+
+// Drag/reorder/remove handlers
+let dragged = null;
+function dragStart(e) {
+  if (running) return e.preventDefault();
+  dragged = e.target;
+  e.target.classList.add('dragging');
+}
+function dragEnd(e) {
+  e.target.classList.remove('dragging');
+  const elementBelow = document.elementFromPoint(e.clientX, e.clientY);
+  if (!commandsContainer.contains(elementBelow)) {
+    e.target.remove();
+    updateCommands();
+  } else updateCommands();
+  dragged = null;
+}
+commandsContainer.addEventListener("dragover", e => {
+  e.preventDefault();
+  const afterElement = getAfter(commandsContainer, e.clientY);
+  if (!afterElement) commandsContainer.appendChild(dragged);
+  else commandsContainer.insertBefore(dragged, afterElement);
+  updateCommands();
+});
+function getAfter(container, y) {
+  const els = [...container.querySelectorAll('.command-cell:not(.dragging)')];
+  return els.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    return offset < 0 && offset > closest.offset ? { offset, element: child } : closest;
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+function updateCommands() {
+  commands = [...commandsContainer.children].map(c => c.textContent.trim().replace("➤", "").trim());
+}
+
+// Run commands
+async function runCommands() {
+  if (commands.length === 0) return;
+  running = true;
+  grid.style.background = '#999';
+  commandsContainer.style.background = '#fafafa';
+  const cmdCells = [...document.querySelectorAll('.command-cell')];
+  cells.forEach(c => c.classList.remove('reached'));
+
+  for (let i = 0; i < commands.length; i++) {
+    highlightCommand(cmdCells, i);
+    await execute(commands[i]);
+    await wait(delay);
+  }
+  checkDestination();
+  running = false;
+}
+
+// Highlight currently running command
+function highlightCommand(cmdCells, i) {
+  cmdCells.forEach((c, idx) => c.classList.toggle('active', i === idx));
+}
+
+// Actual command execution
+function execute(cmd) {
+  return new Promise(resolve => {
+    boy.classList.add('walking');
+    if (cmd === 'turnLeft') facing = (facing + 3) % 4;
+    else if (cmd === 'turnRight') facing = (facing + 1) % 4;
+    else if (cmd === 'moveForward') move(1);
+    else if (cmd === 'moveBackward') move(-1);
+    boy.src = boyImages[facing];
+    setTimeout(() => {
+      boy.classList.remove('walking');
+      resolve();
+    }, delay);
+  });
+}
+
+function move(d) {
+  if (facing === 0) pos.row -= d;
+  if (facing === 1) pos.col += d;
+  if (facing === 2) pos.row += d;
+  if (facing === 3) pos.col -= d;
+  pos.row = Math.max(0, Math.min(gridSize - 1, pos.row));
+  pos.col = Math.max(0, Math.min(gridSize - 1, pos.col));
+  setBoyPosition();
+  highlightPath();
+}
+
+function checkDestination() {
+  const atHouse = pos.row === housePos.row && pos.col === housePos.col;
+  const col = atHouse ? '#b6ffb6' : '#ffb6b6';
+  grid.style.background = col;
+  commandsContainer.style.background = col;
+  if (atHouse) cells[15].classList.add('reached');
+}
+
+function reset() {
+  commands = [];
+  commandsContainer.innerHTML = '';
+  facing = 0;
+  pos = { row: 2, col: 1 };
+  running = false;
+  cells.forEach(c => c.classList.remove('visited', 'reached'));
+  grid.style.background = '#999';
+  commandsContainer.style.background = '#fafafa';
+  setBoyPosition();
+  highlightPath();
+  window.onload();
+}
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
