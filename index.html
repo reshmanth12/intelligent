@@ -56,13 +56,23 @@ nav h3 {
   padding: 10px;
   font-size: 14px;
   cursor: pointer;
-  border: 1px solid #ccc;
-  background: #e0e0e0;
+  border: 1px solid #333;
+  background: #000;          /* Black background */
+  color: #fff;               /* White font */
   border-radius: 4px;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .dropdown button:hover {
-  background: #d0d0d0;
+  background: #222;          /* Slightly lighter black on hover */
+  color: #fff;
+}
+
+/* Optional: When dropdown is open, give a pressed look */
+.dropdown button:active, 
+.dropdown button:focus {
+  background: #111;
+  outline: none;
 }
 
 .dropdown-content {
@@ -249,4 +259,5 @@ searchInputs.forEach(input => {
 </script>
 </body>
 </html>
+
 
